@@ -17,30 +17,31 @@ let db;
         db = mongoClient.db()
         console.log("Conectado ao banco de dados");
     }) .catch ( (error) => {
-        console.log(error);
-        console.log("Algo na conexão com o banco deu errado");
+        console.log("Algo na conexão com o banco deu errado", error);
     })
     
     
 
-app.get("/usuarios", async (req, res) => {
-    const users = await db.collection("users").find().toArray()
+app.get("/participants", async (req, res) => {
+    const users = await db.collection("participants").find().toArray()
     res.send(users)
 })
 
-app.post("/usuarios", async (req, res) => {
-    await db.collection("users").insertOne({
-		email: "joao@email.com",
-		password: "minha_super_senha"
-	})
+app.post("/participants", async (req, res) => {
+    const username = req.body.name
+
+    if (!username) {
+       return res.status(422).send("Nome de usuário inválido")
+    }
+    await db.collection("participants").insertOne({ username })
     res.status(201).send("Usuário Cadastrado")
 })
 
-app.delete("/usuarios/:id", async (req, res) => {
+app.delete("/participants/:id", async (req, res) => {
     const { id } = req.params
    
     try {
-       await db.collection("users").deleteOne( {_id: ObjectId(id)})
+       await db.collection("participants").deleteOne( {_id: ObjectId(id)})
 
         res.status(202).send("OK")
 
