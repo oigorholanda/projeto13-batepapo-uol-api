@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
-import { MongoClient } from "mongodb"
+import { MongoClient, ObjectId } from "mongodb"
 
 
 const app = express()
@@ -34,6 +34,21 @@ app.post("/usuarios", async (req, res) => {
 		password: "minha_super_senha"
 	})
     res.status(201).send("Usuário Cadastrado")
+})
+
+app.delete("/usuarios/:id", async (req, res) => {
+    const { id } = req.params
+   
+    try {
+       await db.collection("users").deleteOne( {_id: ObjectId(id)})
+
+        res.status(202).send("OK")
+
+    } catch (error) {
+        console.log("Erro ao deletar o post", error); 
+    }
+    
+
 })
 
 
