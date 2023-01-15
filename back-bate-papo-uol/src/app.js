@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient, ObjectId } from "mongodb";
 import Joi from "joi";
+import dayjs from "dayjs";
 
 const app = express();
 app.use(cors());
@@ -36,19 +37,26 @@ app.get("/participants", async (req, res) => {
 
 app.post("/participants", async (req, res) => {
   const name = req.body;
-  const valid = schema.validate(name)
-  console.log(valid);
-  if (valid.error) return res.status(422).send(valid.error.message);
+  const validate = schema.validate(name)
+  
+  if (validate.error) return res.status(422).send(validate.error.message);
 
   try {
-    const user = await db.collection("participants").findOne({ name });
+    const busyUsername = await db.collection("participants").findOne({ name:name.name });
 
-    if (user) return res.status(409).send("Nome de usuário já cadastrado");
+    if (busyUsername) return res.status(409).send("Nome de usuário já cadastrado");
 
     await db.collection("participants").insertOne({ 
         name: name.name,
         lastStatus: Date.now()
      });
+    await db.collection("messages").insertOne({
+      from: name.name, 
+      to: 'Todos', 
+      text: 'entra na sala...', 
+      type: 'status', 
+      time: dayjs().format("HH:mm:ss")
+     })
     return res.status(201).send("Usuário Cadastrado");
 
   } catch (error) {
@@ -66,6 +74,11 @@ app.delete("/participants/:id", async (req, res) => {
   } catch (error) {
     console.log("Erro ao deletar o post", error);
   }
+});
+
+app.get("/messages", async (req, res) => {
+  const messages = await db.collection("messages").find().toArray();
+  res.send(messages);
 });
 
 const PORT = process.env.PORT;
