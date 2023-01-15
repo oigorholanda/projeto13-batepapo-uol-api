@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient, ObjectId } from "mongodb";
+import Joi from "joi";
 
 const app = express();
 app.use(cors());
@@ -21,15 +22,23 @@ mongoClient
     console.log("Algo na conexão com o banco deu errado", error);
   });
 
+
+const schema = Joi.object({
+  name: Joi.string().min(3).required(),
+
+}) 
+
 app.get("/participants", async (req, res) => {
   const users = await db.collection("participants").find().toArray();
   res.send(users);
 });
 
-app.post("/participants", async (req, res) => {
-  const name = req.body.name;
 
-  if (!name) return res.status(422).send("Nome de usuário inválido");
+app.post("/participants", async (req, res) => {
+  const name = req.body;
+  const valid = schema.validate(name)
+  console.log(valid);
+  if (valid.error) return res.status(422).send(valid.error.message);
 
   try {
     const user = await db.collection("participants").findOne({ name });
@@ -37,7 +46,7 @@ app.post("/participants", async (req, res) => {
     if (user) return res.status(409).send("Nome de usuário já cadastrado");
 
     await db.collection("participants").insertOne({ 
-        name: name,
+        name: name.name,
         lastStatus: Date.now()
      });
     return res.status(201).send("Usuário Cadastrado");
