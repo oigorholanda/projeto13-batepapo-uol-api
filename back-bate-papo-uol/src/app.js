@@ -172,10 +172,10 @@ setInterval(async () => {
           );
 
           await db.collection("messages").insertMany(inactivityMessages);
-          await db.collection("participants").deleteMany({lastStatus: {$lte: seconds}});
+          await db.collection("participants").deleteMany({lastStatus: {$lte: compareDate}});
       }
   }catch(error){
-      res.status(500).send(error.message);
+      return console.log(error.message);
   }
 },15000);
 
