@@ -57,7 +57,8 @@ app.post("/participants", async (req, res) => {
     return res.status(201).send("Usuário Cadastrado");
 
   } catch (error) {
-    res.status(500).send("Erro ao inserir o usuário", error);
+    res.status(500).send("Erro ao inserir o usuário")
+    console.log(error);
   }
 });
 
@@ -96,7 +97,7 @@ app.post("/messages", async (req, res) => {
     console.log(logedUser);
     if (!logedUser) return res.status(422).send("Usuário não logado")
     
-    await db.colletion("messages").insertOne({
+    await db.collection("messages").insertOne({
       from: name,
       to, 
       text, 
@@ -107,7 +108,8 @@ app.post("/messages", async (req, res) => {
     res.status(201).send('Mensagem salva')
     
   } catch (error) {
-    res.status(500).send("Erro ao salvar a mensagem", error);
+    res.status(500).send("Erro ao salvar a mensagem")
+    console.log(error);
   }
 
 
