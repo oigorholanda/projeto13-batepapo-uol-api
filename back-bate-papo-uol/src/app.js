@@ -136,6 +136,49 @@ app.post("/messages", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT;
+app.post("/status", async (req, res) => {
+  const name = req.headers.user;
+
+  try {
+    const activeUser = await db.collection("participants").updateOne({ name }, { $set: { lastStatus: Date.now() } });
+
+    if (activeUser.modifiedCount === 0) return res.status(404).send("Usuário não logado");
+
+    res.sendStatus(200)
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Erro ao localizar o participante");
+  }
+})
+
+setInterval(async () => {
+  const compareDate = Date.now()-10000;
+
+  try{
+      const inactivity = await db.collection("participants").find({lastStatus: {$lte: compareDate}}).toArray();
+
+      if(inactivity.length > 0){
+          const inactivityMessages = inactivity.map(
+              (user) => { 
+                  return {
+                      from: user.name,
+                      to: "Todos",
+                      text: "sai da sala...",
+                      type: "status",
+                      time: dayjs().format("HH:mm:ss")
+                  };
+
+              }
+          );
+
+          await db.collection("messages").insertMany(inactivityMessages);
+          await db.collection("participants").deleteMany({lastStatus: {$lte: seconds}});
+      }
+  }catch(error){
+      res.status(500).send(error.message);
+  }
+},15000);
+
+const PORT = 5000;
 
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
