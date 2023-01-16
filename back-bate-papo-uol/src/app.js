@@ -33,36 +33,39 @@ app.get("/participants", async (req, res) => {
 
 app.post("/participants", async (req, res) => {
   const name = req.body;
-  const schema = Joi.object({name: Joi.string().min(3).required()}) 
-  const validate = schema.validate(name)
-  
+  const schema = Joi.object({ name: Joi.string().min(3).required() });
+  const validate = schema.validate(name);
+
   if (validate.error) return res.status(422).send(validate.error.message);
 
   try {
-    const busyUsername = await db.collection("participants").findOne({ name: name.name });
+    const busyUsername = await db.collection("participants").findOne({ name: name.name })
 
-    if (busyUsername) return res.status(409).send("Nome de usuário já cadastrado");
+    if (busyUsername)
+      return res.status(409).send("Nome de usuário já cadastrado");
 
-    await db.collection("participants").insertOne({ 
-        name: name.name,
-        lastStatus: Date.now()
-     });
+    await db.collection("participants").insertOne({
+      name: name.name,
+      lastStatus: Date.now(),
+    });
+
     await db.collection("messages").insertOne({
-      from: name.name, 
-      to: 'Todos', 
-      text: 'entra na sala...', 
-      type: 'status', 
-      time: dayjs().format("HH:mm:ss")
-     })
-    return res.status(201).send("Usuário Cadastrado");
+      from: name.name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: dayjs().format("HH:mm:ss"),
+    });
+
+    res.status(201).send("Usuário Cadastrado")
 
   } catch (error) {
-    res.status(500).send("Erro ao inserir o usuário")
     console.log(error);
+    return res.status(500).send("Erro ao inserir o usuário");
   }
 });
 
-// ALterar para deletar mensagens depois 
+// ALterar para deletar mensagens depois
 app.delete("/participants/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -76,44 +79,62 @@ app.delete("/participants/:id", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-  const messages = await db.collection("messages").find().toArray();
+  const limit = parseInt(req.query.limit);
+  const name = req.headers.user;
+
+  if (limit) {
+    const limitedMessages = await db
+      .collection("messages")
+      .find({
+        $or: [{ from: name }, { type: "message" }, { type: "status" }, { type: "private_message", to: name }],
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    return res.send(limitedMessages);
+  }
+
+  const messages = await db
+    .collection("messages")
+    .find({
+      $or: [{ from: name }, { type: "message" }, { type: "status" }, { type: "private_message", to: name }],
+    })
+    .toArray();
   res.send(messages);
 });
 
 app.post("/messages", async (req, res) => {
-  const name  = req.headers.user
-  const {to, text, type} = req.body
+  const name = req.headers.user;
+  const { to, text, type } = req.body;
   const schema = Joi.object({
-  to: Joi.string().required(),
-  text: Joi.string().required(),
-  type: Joi.any().valid("message","private_message").required()
-  })
-  const validation = schema.validate(req.body, { abortEarly:false })
+    to: Joi.string().required(),
+    text: Joi.string().required(),
+    type: Joi.any().valid("message", "private_message").required(),
+  });
+  const validation = schema.validate(req.body, { abortEarly: false });
 
-  if (validation.error) return res.status(422).send(validation.error.message)
+  if (validation.error) return res.status(422).send(validation.error.message);
 
   try {
-    const logedUser = await db.collection("participants").findOne({ name })
+    const logedUser = await db.collection("participants").findOne({ name });
     console.log(logedUser);
-    if (!logedUser) return res.status(422).send("Usuário não logado")
-    
+    if (!logedUser) return res.status(422).send("Usuário não logado");
+
     await db.collection("messages").insertOne({
       from: name,
-      to, 
-      text, 
-      type, 
-      time: dayjs().format("HH:mm:ss")
-      })
+      to,
+      text,
+      type,
+      time: dayjs().format("HH:mm:ss"),
+    });
 
-    res.status(201).send('Mensagem salva')
-    
+    res.status(201).send("Mensagem salva");
   } catch (error) {
-    res.status(500).send("Erro ao salvar a mensagem")
     console.log(error);
+    return res.status(500).send("Erro ao salvar a mensagem");
   }
-
-
-})
+});
 
 const PORT = process.env.PORT;
 
