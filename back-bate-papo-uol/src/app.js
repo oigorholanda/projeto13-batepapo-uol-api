@@ -24,10 +24,6 @@ mongoClient
   });
 
 
-const schema = Joi.object({
-  name: Joi.string().min(3).required(),
-
-}) 
 
 app.get("/participants", async (req, res) => {
   const users = await db.collection("participants").find().toArray();
@@ -37,12 +33,13 @@ app.get("/participants", async (req, res) => {
 
 app.post("/participants", async (req, res) => {
   const name = req.body;
+  const schema = Joi.object({name: Joi.string().min(3).required()}) 
   const validate = schema.validate(name)
   
   if (validate.error) return res.status(422).send(validate.error.message);
 
   try {
-    const busyUsername = await db.collection("participants").findOne({ name:name.name });
+    const busyUsername = await db.collection("participants").findOne({ name: name.name });
 
     if (busyUsername) return res.status(409).send("Nome de usuário já cadastrado");
 
@@ -60,10 +57,11 @@ app.post("/participants", async (req, res) => {
     return res.status(201).send("Usuário Cadastrado");
 
   } catch (error) {
-    console.log("Erro ao inserir o usuário", error);
+    res.status(500).send("Erro ao inserir o usuário", error);
   }
 });
 
+// ALterar para deletar mensagens depois 
 app.delete("/participants/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -72,7 +70,7 @@ app.delete("/participants/:id", async (req, res) => {
 
     res.status(202).send("OK");
   } catch (error) {
-    console.log("Erro ao deletar o post", error);
+    console.log("Erro ao deletar o participante", error);
   }
 });
 
@@ -80,6 +78,40 @@ app.get("/messages", async (req, res) => {
   const messages = await db.collection("messages").find().toArray();
   res.send(messages);
 });
+
+app.post("/messages", async (req, res) => {
+  const name  = req.headers.user
+  const {to, text, type} = req.body
+  const schema = Joi.object({
+  to: Joi.string().required(),
+  text: Joi.string().required(),
+  type: Joi.any().valid("message","private_message").required()
+  })
+  const validation = schema.validate(req.body, { abortEarly:false })
+
+  if (validation.error) return res.status(422).send(validation.error.message)
+
+  try {
+    const logedUser = await db.collection("participants").findOne({ name })
+    console.log(logedUser);
+    if (!logedUser) return res.status(422).send("Usuário não logado")
+    
+    await db.colletion("messages").insertOne({
+      from: name,
+      to, 
+      text, 
+      type, 
+      time: dayjs().format("HH:mm:ss")
+      })
+
+    res.status(201).send('Mensagem salva')
+    
+  } catch (error) {
+    res.status(500).send("Erro ao salvar a mensagem", error);
+  }
+
+
+})
 
 const PORT = process.env.PORT;
 
