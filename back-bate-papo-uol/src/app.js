@@ -24,7 +24,6 @@ mongoClient
   });
 
 
-
 app.get("/participants", async (req, res) => {
   const users = await db.collection("participants").find().toArray();
   res.send(users);
@@ -64,45 +63,26 @@ app.post("/participants", async (req, res) => {
   }
 });
 
-// ALterar para deletar mensagens depois
-app.delete("/messages/:id", async (req, res) => {
-  const { id } = req.params;
-  const name = req.headers.user;
-
-  try {
-    const delMsg = await db.collection("messages").findOne({ _id: ObjectId(id) });
-
-    if (!delMsg) return res.status(404).send("Não exite mensagem com esse ID");
-
-    if (delMsg.from !== name) return res.status(401).send("Mensagem não é do usuário");
-
-    await db.collection("messages").deleteOne({ _id: ObjectId(id) });
-
-    res.status(202).send("Apagada");
-  } catch (error) {
-    console.log("Erro ao deletar a mensagem", error);
-  }
-});
 
 app.get("/messages", async (req, res) => {
-  const limit = req.query.limit;
+  const limit = req.query.limit
   const name = req.headers.user;
 
-  if ((limit && isNaN(limit)) || limit <= 0) return res.sendStatus(422);
+  if (limit && isNaN(limit) || limit <= 0) return res.sendStatus(422);
 
   try {
+    const limited = limit? parseInt(limit): 0
     const limitedMessages = await db
       .collection("messages")
       .find({
         $or: [
           { from: name },
           { type: "message" },
-          { type: "status" },
           { type: "private_message", to: name },
+          { type: "status" }          
         ],
       })
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
+      .limit(limited)
       .toArray();
 
     res.send(limitedMessages);
@@ -141,6 +121,25 @@ app.post("/messages", async (req, res) => {
   } catch (error) {
     console.log(error);
     return res.status(500).send("Erro ao postar a mensagem");
+  }
+});
+
+app.delete("/messages/:id", async (req, res) => {
+  const { id } = req.params;
+  const name = req.headers.user;
+
+  try {
+    const delMsg = await db.collection("messages").findOne({ _id: ObjectId(id) });
+
+    if (!delMsg) return res.status(404).send("Não exite mensagem com esse ID");
+
+    if (delMsg.from !== name) return res.status(401).send("Mensagem não é do usuário");
+
+    await db.collection("messages").deleteOne({ _id: ObjectId(id) });
+
+    res.status(202).send("Apagada");
+  } catch (error) {
+    console.log("Erro ao deletar a mensagem", error);
   }
 });
 
