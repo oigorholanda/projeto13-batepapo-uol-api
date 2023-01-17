@@ -57,8 +57,7 @@ app.post("/participants", async (req, res) => {
       time: dayjs().format("HH:mm:ss"),
     });
 
-    res.status(201).send("Usuário Cadastrado")
-
+    res.status(201).send("Usuário Cadastrado");
   } catch (error) {
     console.log(error);
     return res.status(500).send("Erro ao inserir o usuário");
@@ -66,42 +65,51 @@ app.post("/participants", async (req, res) => {
 });
 
 // ALterar para deletar mensagens depois
-app.delete("/participants/:id", async (req, res) => {
+app.delete("/messages/:id", async (req, res) => {
   const { id } = req.params;
+  const name = req.headers.user;
 
   try {
-    await db.collection("participants").deleteOne({ _id: ObjectId(id) });
+    const delMsg = await db.collection("messages").findOne({ _id: ObjectId(id) });
 
-    res.status(202).send("OK");
+    if (!delMsg) return res.status(404).send("Não exite mensagem com esse ID");
+
+    if (delMsg.from !== name) return res.status(401).send("Mensagem não é do usuário");
+
+    await db.collection("messages").deleteOne({ _id: ObjectId(id) });
+
+    res.status(202).send("Apagada");
   } catch (error) {
-    console.log("Erro ao deletar o participante", error);
+    console.log("Erro ao deletar a mensagem", error);
   }
 });
 
 app.get("/messages", async (req, res) => {
-  const limit = parseInt(req.query.limit);
+  const limit = req.query.limit;
   const name = req.headers.user;
 
-  if (limit) {
+  if ((limit && isNaN(limit)) || limit <= 0) return res.sendStatus(422);
+
+  try {
     const limitedMessages = await db
       .collection("messages")
       .find({
-        $or: [{ from: name }, { type: "message" }, { type: "status" }, { type: "private_message", to: name }],
+        $or: [
+          { from: name },
+          { type: "message" },
+          { type: "status" },
+          { type: "private_message", to: name },
+        ],
       })
       .sort({ createdAt: -1 })
-      .limit(limit)
+      .limit(parseInt(limit))
       .toArray();
 
-    return res.send(limitedMessages);
+    res.send(limitedMessages);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send("Erro ao requisitar a mensagem");
   }
-
-  const messages = await db
-    .collection("messages")
-    .find({
-      $or: [{ from: name }, { type: "message" }, { type: "status" }, { type: "private_message", to: name }],
-    })
-    .toArray();
-  res.send(messages);
 });
 
 app.post("/messages", async (req, res) => {
@@ -118,7 +126,7 @@ app.post("/messages", async (req, res) => {
 
   try {
     const logedUser = await db.collection("participants").findOne({ name });
-    console.log(logedUser);
+
     if (!logedUser) return res.status(422).send("Usuário não logado");
 
     await db.collection("messages").insertOne({
@@ -129,10 +137,10 @@ app.post("/messages", async (req, res) => {
       time: dayjs().format("HH:mm:ss"),
     });
 
-    res.status(201).send("Mensagem salva");
+    res.status(201).send("Mensagem postada");
   } catch (error) {
     console.log(error);
-    return res.status(500).send("Erro ao salvar a mensagem");
+    return res.status(500).send("Erro ao postar a mensagem");
   }
 });
 
@@ -144,40 +152,40 @@ app.post("/status", async (req, res) => {
 
     if (activeUser.modifiedCount === 0) return res.status(404).send("Usuário não logado");
 
-    res.sendStatus(200)
+    res.sendStatus(200);
   } catch (error) {
     console.log(error);
     return res.status(500).send("Erro ao localizar o participante");
   }
-})
+});
 
 setInterval(async () => {
-  const compareDate = Date.now()-10000;
+  const compareDate = Date.now() - 10000;
 
-  try{
-      const inactivity = await db.collection("participants").find({lastStatus: {$lte: compareDate}}).toArray();
+  try {
+    const inactivity = await db
+      .collection("participants")
+      .find({ lastStatus: { $lte: compareDate } })
+      .toArray();
 
-      if(inactivity.length > 0){
-          const inactivityMessages = inactivity.map(
-              (user) => { 
-                  return {
-                      from: user.name,
-                      to: "Todos",
-                      text: "sai da sala...",
-                      type: "status",
-                      time: dayjs().format("HH:mm:ss")
-                  };
+    if (inactivity.length > 0) {
+      const inactivityMessages = inactivity.map((user) => {
+        return {
+          from: user.name,
+          to: "Todos",
+          text: "sai da sala...",
+          type: "status",
+          time: dayjs().format("HH:mm:ss"),
+        };
+      });
 
-              }
-          );
-
-          await db.collection("messages").insertMany(inactivityMessages);
-          await db.collection("participants").deleteMany({lastStatus: {$lte: compareDate}});
-      }
-  }catch(error){
-      return console.log(error.message);
+      await db.collection("messages").insertMany(inactivityMessages);
+      await db.collection("participants").deleteMany({ lastStatus: { $lte: compareDate } });
+    }
+  } catch (error) {
+    return console.log(error.message);
   }
-},15000);
+}, 15000);
 
 const PORT = 5000;
 
